@@ -1,0 +1,928 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CareCompanion – Webpage (Patients + Reminders + Gamification)</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    :root { --brand-600:#2563eb; }
+    body { font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial; }
+    /* small “pill” for time badges */
+    .time-pill {
+      display:inline-flex; align-items:center; gap:.35rem;
+      padding:.125rem .5rem; border-radius:9999px; font-size:.75rem; font-weight:500;
+      background: var(--pill-bg, #e5e7eb); color:#111827; border:1px solid rgba(0,0,0,.06);
+    }
+    /* subtle accent ring for inputs we color by time */
+    .time-accent {
+      transition: box-shadow .2s ease, background-color .2s ease, border-color .2s ease;
+      box-shadow: 0 0 0 3px var(--accent-ring, transparent);
+      background-color: var(--accent-bg, transparent);
+      border-color: var(--accent-border, #d1d5db);
+    }
+    .dark .time-pill { color:#0b0f19; }
+  </style>
+</head>
+<body class="bg-gray-50">
+  <div class="mx-auto max-w-7xl flex">
+    <!-- Sidebar -->
+    <aside class="sticky top-0 h-dvh w-64 border-r border-gray-200 bg-white p-4">
+      <div class="mb-6 px-2">
+        <h1 class="text-xl font-bold text-gray-800">CareCompanion</h1>
+        <p class="text-xs text-gray-500">webpage-only demo</p>
+      </div>
+      <nav class="space-y-1">
+        <button data-nav="patients" class="w-full text-left flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium hover:bg-gray-100"><span>🧑‍⚕️</span> <span>Patients</span></button>
+        <button data-nav="meds" class="w-full text-left flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium hover:bg-gray-100"><span>💊</span> <span>Medications</span></button>
+        <button data-nav="appts" class="w-full text-left flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium hover:bg-gray-100"><span>🩺</span> <span>Appointments</span></button>
+        <button data-nav="vitals" class="w-full text-left flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium hover:bg-gray-100"><span>📊</span> <span>Vitals</span></button>
+        <button data-nav="dash" class="w-full text-left flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium hover:bg-gray-100"><span>👨‍👩‍👧</span> <span>Dashboard</span></button>
+      </nav>
+    </aside>
+
+    <!-- Main -->
+    <main class="min-h-dvh flex-1 bg-gray-50 p-6">
+      <!-- Top bar -->
+      <div class="mb-4 flex flex-wrap items-center gap-3 justify-between">
+        <div class="flex items-center gap-2 text-sm text-gray-600">
+          <span class="font-medium">Active patient:</span>
+          <select id="patient-switcher" class="rounded-lg border border-gray-300 bg-white px-2 py-1 text-sm"></select>
+          <button id="seed-demo" class="rounded-lg border border-gray-300 bg-white px-3 py-1 text-sm hover:bg-gray-100">Seed demo data</button>
+          <button id="notify-btn" class="rounded-lg border border-gray-300 bg-white px-3 py-1 text-sm hover:bg-gray-100">Enable reminders 🔔</button>
+        </div>
+        <button id="dark-toggle" class="rounded-lg border border-gray-300 bg-white px-3 py-1 text-sm hover:bg-gray-100">🌙 Dark</button>
+      </div>
+
+      <!-- Toasts -->
+      <div id="toasts" class="fixed right-4 bottom-4 z-50 space-y-2"></div>
+
+      <div class="grid gap-6">
+        <!-- Patients Page -->
+        <section id="page-patients" class="hidden">
+          <section class="rounded-2xl bg-white p-4 shadow-sm">
+            <div class="mb-3 flex items-center justify-between">
+              <h3 class="text-lg font-semibold text-gray-800">Add Patient</h3>
+            </div>
+            <form id="patient-form" class="grid grid-cols-1 gap-3 md:grid-cols-4">
+              <div>
+                <label class="text-sm text-gray-600">Name</label>
+                <input id="pat-name" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm shadow-inner focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Riya Sharma" required>
+              </div>
+              <div>
+                <label class="text-sm text-gray-600">Age</label>
+                <input id="pat-age" type="number" min="0" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm shadow-inner focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="68">
+              </div>
+              <div>
+                <label class="text-sm text-gray-600">Notes</label>
+                <input id="pat-notes" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm shadow-inner" placeholder="Diabetes, BP">
+              </div>
+              <div class="flex items-end">
+                <button class="inline-flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-medium shadow-sm transition active:scale-[.98] bg-blue-600 text-white hover:bg-blue-500 w-full" type="submit">Add</button>
+              </div>
+            </form>
+          </section>
+          <section class="rounded-2xl bg-white p-4 shadow-sm">
+            <div class="mb-3 flex items-center justify-between">
+              <h3 class="text-lg font-semibold text-gray-800">Patients</h3>
+            </div>
+            <ul id="patients-list" class="divide-y"></ul>
+          </section>
+        </section>
+
+        <!-- Medications Page -->
+        <section id="page-meds" class="hidden">
+          <section class="rounded-2xl bg-white p-4 shadow-sm">
+            <div class="mb-3 flex items-center justify-between">
+              <h3 class="text-lg font-semibold text-gray-800">Add Medication</h3>
+            </div>
+            <form id="med-form" class="grid grid-cols-1 gap-3 md:grid-cols-4">
+              <div>
+                <label class="text-sm text-gray-600">Medication</label>
+                <input id="med-name" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm shadow-inner focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Metformin" required>
+              </div>
+              <div>
+                <label class="text-sm text-gray-600">Dose</label>
+                <input id="med-dose" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm shadow-inner focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="500 mg" required>
+              </div>
+              <div>
+                <label class="text-sm text-gray-600">Time</label>
+                <input id="med-time" type="time" value="08:00" class="time-accent w-full rounded-xl border bg-white px-3 py-2 text-sm shadow-inner focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+              </div>
+              <div class="flex items-end">
+                <button class="inline-flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-medium shadow-sm transition active:scale-[.98] bg-blue-600 text-white hover:bg-blue-500 w-full" type="submit">Add</button>
+              </div>
+            </form>
+          </section>
+
+          <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <section class="rounded-2xl bg-white p-4 shadow-sm lg:col-span-2">
+              <div class="mb-3 flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-gray-800">Daily Schedule</h3>
+                <div class="text-sm text-gray-500">Mark doses for today</div>
+              </div>
+              <ul id="med-list" class="divide-y"></ul>
+            </section>
+
+            <section class="rounded-2xl bg-white p-4 shadow-sm">
+              <div class="mb-3 flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-gray-800">Adherence</h3>
+              </div>
+              <canvas id="adherenceChart" height="240"></canvas>
+            </section>
+
+            <section class="rounded-2xl bg-white p-4 shadow-sm lg:col-span-3">
+              <div class="mb-3 flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-gray-800">History Log</h3>
+              </div>
+              <div class="max-h-64 overflow-auto text-sm">
+                <ul id="med-history" class="space-y-2"></ul>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <!-- Appointments Page -->
+        <section id="page-appts" class="hidden">
+          <section class="rounded-2xl bg-white p-4 shadow-sm">
+            <div class="mb-3 flex items-center justify-between">
+              <h3 class="text-lg font-semibold text-gray-800">Add Appointment</h3>
+            </div>
+            <form id="appt-form" class="grid grid-cols-1 gap-3 md:grid-cols-6">
+              <div class="md:col-span-2">
+                <label class="text-sm text-gray-600">Doctor</label>
+                <input id="appt-doctor" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm shadow-inner focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Dr. Patel" required>
+              </div>
+              <div class="md:col-span-2">
+                <label class="text-sm text-gray-600">Doctor Type</label>
+                <input id="appt-type" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm shadow-inner focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Cardiologist" required>
+              </div>
+              <div>
+                <label class="text-sm text-gray-600">Date</label>
+                <input id="appt-date" type="date" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm shadow-inner focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+              </div>
+              <div>
+                <label class="text-sm text-gray-600">Time</label>
+                <input id="appt-time" type="time" value="10:00" class="time-accent w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm shadow-inner focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+              </div>
+              <div class="md:col-span-3">
+                <label class="text-sm text-gray-600">Location</label>
+                <input id="appt-location" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm shadow-inner focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Fortis, Andheri" required>
+              </div>
+              <div class="md:col-span-3 flex items-end gap-2">
+                <input id="appt-gcal" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm shadow-inner focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Google Calendar link (optional)">
+                <button class="inline-flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-medium shadow-sm transition active:scale-[.98] bg-blue-600 text-white hover:bg-blue-500" type="submit">Add</button>
+              </div>
+            </form>
+          </section>
+
+          <section class="rounded-2xl bg-white p-4 shadow-sm">
+            <div class="mb-3 flex items-center justify-between">
+              <h3 class="text-lg font-semibold text-gray-800">Upcoming Appointments</h3>
+            </div>
+            <ul id="appt-list" class="divide-y"></ul>
+          </section>
+        </section>
+
+        <!-- Vitals Page -->
+        <section id="page-vitals" class="hidden">
+          <section class="rounded-2xl bg-white p-4 shadow-sm">
+            <div class="mb-3 flex items-center justify-between">
+              <h3 class="text-lg font-semibold text-gray-800">Enter Vitals</h3>
+            </div>
+            <form id="vitals-form" class="grid grid-cols-2 gap-3 md:grid-cols-6">
+              <div>
+                <label class="text-sm text-gray-600">Date</label>
+                <input id="vit-date" type="date" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm shadow-inner focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+              </div>
+              <div>
+                <label class="text-sm text-gray-600">BP Systolic</label>
+                <input id="vit-sys" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm shadow-inner focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="120">
+              </div>
+              <div>
+                <label class="text-sm text-gray-600">BP Diastolic</label>
+                <input id="vit-dia" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm shadow-inner focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="80">
+              </div>
+              <div>
+                <label class="text-sm text-gray-600">Glucose (mg/dL)</label>
+                <input id="vit-glu" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm shadow-inner focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="95">
+              </div>
+              <div>
+                <label class="text-sm text-gray-600">Weight (kg)</label>
+                <input id="vit-wt" class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm shadow-inner focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="70">
+              </div>
+              <div class="flex items-end">
+                <button class="inline-flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-medium shadow-sm transition active:scale-[.98] bg-blue-600 text-white hover:bg-blue-500 w-full" type="submit">Add</button>
+              </div>
+            </form>
+          </section>
+
+          <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <section class="rounded-2xl bg-white p-4 shadow-sm lg:col-span-2">
+              <div class="mb-3 flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-gray-800">Weekly / Monthly Trends</h3>
+              </div>
+              <div class="grid gap-6">
+                <canvas id="weeklyChart" height="200"></canvas>
+                <canvas id="monthlyChart" height="200"></canvas>
+              </div>
+            </section>
+            <section class="rounded-2xl bg-white p-4 shadow-sm">
+              <div class="mb-3 flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-gray-800">Latest Entries</h3>
+              </div>
+              <ul id="vitals-list" class="divide-y text-sm"></ul>
+            </section>
+          </div>
+        </section>
+
+        <!-- Dashboard Page -->
+        <section id="page-dash">
+          <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <section class="rounded-2xl bg-white p-4 shadow-sm">
+              <div class="mb-3 flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-gray-800">Peace-of-Mind Score</h3>
+              </div>
+              <canvas id="peaceChart" height="220"></canvas>
+            </section>
+
+            <section class="rounded-2xl bg-white p-4 shadow-sm">
+              <div class="mb-3 flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-gray-800">Weekly Digest</h3>
+              </div>
+              <ul class="text-sm text-gray-700" id="digest-list"></ul>
+            </section>
+
+            <section class="rounded-2xl bg-white p-4 shadow-sm">
+              <div class="mb-3 flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-gray-800">Glucose – Weekly Trend</h3>
+              </div>
+              <canvas id="dashGlucose" height="220"></canvas>
+            </section>
+
+            <!-- Gamification Card -->
+            <section class="rounded-2xl bg-white p-4 shadow-sm lg:col-span-3">
+              <div class="mb-3 flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-gray-800">Gamification</h3>
+              </div>
+              <div class="grid gap-4 md:grid-cols-3">
+                <!-- Streak -->
+                <div class="rounded-xl border p-4">
+                  <p class="text-sm text-gray-500 mb-1">Daily Streak</p>
+                  <div class="text-3xl font-bold text-gray-800"><span id="streak-value">0</span><span class="text-lg font-semibold text-orange-500">🔥</span></div>
+                  <p class="text-xs text-gray-500">Consecutive days with 100% adherence</p>
+                </div>
+                <!-- XP -->
+                <div class="rounded-xl border p-4">
+                  <p class="text-sm text-gray-500 mb-1">Level & XP</p>
+                  <div class="flex items-end gap-2 mb-2">
+                    <div class="text-2xl font-bold text-gray-800">Lv <span id="level-value">1</span></div>
+                    <div class="text-sm text-gray-500">(<span id="xp-cur">0</span>/<span id="xp-next">100</span> XP)</div>
+                  </div>
+                  <div class="w-full h-3 rounded-full bg-gray-200 overflow-hidden">
+                    <div id="xp-bar" class="h-3 bg-blue-600 rounded-full" style="width:0%"></div>
+                  </div>
+                  <p class="text-xs text-gray-500 mt-2">+10 XP per Taken dose, +5 XP per vitals log</p>
+                </div>
+                <!-- Badges -->
+                <div class="rounded-xl border p-4">
+                  <p class="text-sm text-gray-500 mb-2">Badges</p>
+                  <ul id="badges-list" class="space-y-2 text-sm"></ul>
+                </div>
+              </div>
+            </section>
+          </div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+
+<script>
+// ===== Utilities / Storage (multi-patient aware) =====
+const storeKey = 'cc_webpage_store_v3_gamify';
+function load(){
+  try { return JSON.parse(localStorage.getItem(storeKey)) || { patients:[], activePatientId:null, records:{} } }
+  catch { return { patients:[], activePatientId:null, records:{} } }
+}
+function save(s){ localStorage.setItem(storeKey, JSON.stringify(s)); }
+function uid(){ return (crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now() + Math.random()); }
+function todayISO(){ return new Date().toISOString().slice(0,10); }
+
+let state = load();
+function ensureActivePatient(){
+  if(!state.activePatientId){
+    if(state.patients.length===0){
+      const id = uid();
+      state.patients.push({ id, name:'Default Patient', age:'', notes:'' });
+      state.activePatientId = id;
+      state.records[id] = { meds:[], appts:[], vitals:[], gamify:{ xp:0 } }
+      save(state);
+    } else {
+      state.activePatientId = state.patients[0].id;
+      state.records[state.activePatientId] = state.records[state.activePatientId] || { meds:[], appts:[], vitals:[], gamify:{ xp:0 } }
+      if(!state.records[state.activePatientId].gamify) state.records[state.activePatientId].gamify = { xp:0 };
+      save(state);
+    }
+  } else {
+    state.records[state.activePatientId] = state.records[state.activePatientId] || { meds:[], appts:[], vitals:[], gamify:{ xp:0 } }
+    if(!state.records[state.activePatientId].gamify) state.records[state.activePatientId].gamify = { xp:0 };
+    save(state);
+  }
+}
+function rec(){ ensureActivePatient(); return state.records[state.activePatientId]; }
+
+// ===== Dark mode =====
+const darkBtn = document.getElementById('dark-toggle');
+function setDark(on){
+  document.documentElement.classList.toggle('dark', on);
+  document.body.classList.toggle('bg-gray-950', on);
+  darkBtn.textContent = on ? '☀️ Light' : '🌙 Dark';
+  localStorage.setItem('cc_dark', on ? '1':'0');
+}
+setDark(localStorage.getItem('cc_dark') === '1');
+darkBtn.addEventListener('click', ()=> setDark(!(localStorage.getItem('cc_dark')==='1')));
+
+// ===== Toasts =====
+const toasts = document.getElementById('toasts');
+function toast(msg, kind='info'){
+  const div = document.createElement('div');
+  div.className = `rounded-xl px-4 py-3 text-sm shadow-md ${kind==='warn'?'bg-yellow-100 text-yellow-900': kind==='error'?'bg-red-100 text-red-900':'bg-white text-gray-800'}`;
+  div.textContent = msg;
+  toasts.appendChild(div);
+  setTimeout(()=>{ div.remove(); }, 3500);
+}
+
+// ===== Notification API =====
+document.getElementById('notify-btn').addEventListener('click', async ()=>{
+  if(!('Notification' in window)) { toast('Notifications not supported','warn'); return; }
+  const perm = await Notification.requestPermission();
+  if(perm==='granted'){ toast('Reminders enabled 🔔'); }
+  else { toast('Notifications blocked','warn'); }
+});
+function notify(title, body){
+  try {
+    if('Notification' in window && Notification.permission==='granted'){
+      new Notification(title, { body });
+    }
+  } catch(e){}
+}
+
+// ===== Navigation =====
+const pages = {
+  patients: document.getElementById('page-patients'),
+  meds: document.getElementById('page-meds'),
+  appts: document.getElementById('page-appts'),
+  vitals: document.getElementById('page-vitals'),
+  dash: document.getElementById('page-dash'),
+};
+function show(page){
+  Object.values(pages).forEach(p=>p.classList.add('hidden'));
+  pages[page].classList.remove('hidden');
+  if(page==='patients') renderPatients();
+  if(page==='meds') renderMeds();
+  if(page==='appts') renderAppts();
+  if(page==='vitals') renderVitals();
+  if(page==='dash') renderDashboard();
+}
+document.querySelectorAll('[data-nav]').forEach(btn => btn.addEventListener('click', ()=> show(btn.dataset.nav)));
+
+// ===== Time-of-day accent (applies only to time widgets & pills) =====
+const TIME_THEMES = {
+  morning: { ring:'rgba(253,230,138,.6)', bg:'rgba(253,230,138,.25)', border:'rgba(253,230,138,.9)', pill:'rgba(253,230,138,1)' },   // #FDE68A
+  afternoon:{ ring:'rgba(253,186,116,.6)', bg:'rgba(253,186,116,.25)', border:'rgba(253,186,116,.9)', pill:'rgba(253,186,116,1)' }, // #FDBA74
+  night:    { ring:'rgba(147,197,253,.6)', bg:'rgba(147,197,253,.25)', border:'rgba(147,197,253,.9)', pill:'rgba(147,197,253,1)' }  // #93C5FD
+};
+function getTimeSlot(date = new Date()) {
+  const h = date.getHours();
+  if (h >= 5 && h < 12) return 'morning';
+  if (h >= 12 && h < 18) return 'afternoon';
+  return 'night';
+}
+function hhmmToSlot(hhmm) {
+  if (!hhmm || !/^\d{2}:\d{2}$/.test(hhmm)) return getTimeSlot();
+  const h = parseInt(hhmm.split(':')[0], 10);
+  if (h >= 5 && h < 12) return 'morning';
+  if (h >= 12 && h < 18) return 'afternoon';
+  return 'night';
+}
+function accentElement(el, hhmm){
+  const slot = hhmmToSlot(hhmm);
+  const theme = TIME_THEMES[slot];
+  if(!el) return;
+  el.style.setProperty('--accent-ring', theme.ring);
+  el.style.setProperty('--accent-bg', theme.bg);
+  el.style.setProperty('--accent-border', theme.border);
+}
+function accentPill(el, hhmm){
+  const slot = hhmmToSlot(hhmm);
+  const theme = TIME_THEMES[slot];
+  if(!el) return;
+  el.style.setProperty('--pill-bg', theme.pill);
+}
+
+// init accents for the top form inputs
+function initTimeAccents(){
+  const medTimeEl = document.getElementById('med-time');
+  const apptTimeEl = document.getElementById('appt-time');
+  if (medTimeEl){ accentElement(medTimeEl, medTimeEl.value); medTimeEl.addEventListener('input', e=> accentElement(e.target, e.target.value)); }
+  if (apptTimeEl){ accentElement(apptTimeEl, apptTimeEl.value); apptTimeEl.addEventListener('input', e=> accentElement(e.target, e.target.value)); }
+}
+document.addEventListener('DOMContentLoaded', initTimeAccents);
+
+// ===== Patients =====
+const patForm = document.getElementById('patient-form');
+const patList = document.getElementById('patients-list');
+const patSwitcher = document.getElementById('patient-switcher');
+
+function renderPatients(){
+  patList.innerHTML='';
+  state.patients.forEach(p=>{
+    const li = document.createElement('li');
+    li.className='flex items-center justify-between p-3';
+    li.innerHTML = `
+      <div>
+        <p class="font-medium text-gray-800">${p.name} ${p.age?`<span class="text-xs text-gray-500">(${p.age})</span>`:''}</p>
+        <p class="text-xs text-gray-500">${p.notes||''}</p>
+      </div>
+      <div class="flex gap-2">
+        <button class="rounded-lg border border-gray-300 bg-white px-3 py-1 text-sm hover:bg-gray-100">Set Active</button>
+        <button class="rounded-lg border border-red-300 bg-white px-3 py-1 text-sm hover:bg-red-50 text-red-700">Delete</button>
+      </div>`;
+    const [btnActive, btnDel] = li.querySelectorAll('button');
+    btnActive.addEventListener('click', ()=>{
+      state.activePatientId = p.id; save(state);
+      toast(`Active patient: ${p.name}`);
+      renderPatientSwitcher();
+      renderDashboard();
+    });
+    btnDel.addEventListener('click', ()=>{
+      if(confirm('Delete patient and all their data?')){
+        delete state.records[p.id];
+        state.patients = state.patients.filter(x=>x.id!==p.id);
+        if(state.activePatientId===p.id) state.activePatientId = state.patients[0]?.id || null;
+        save(state); ensureActivePatient(); renderPatients(); renderPatientSwitcher(); renderDashboard();
+      }
+    });
+    patList.appendChild(li);
+  });
+}
+
+function renderPatientSwitcher(){
+  patSwitcher.innerHTML='';
+  state.patients.forEach(p=>{
+    const opt = document.createElement('option');
+    opt.value = p.id; opt.textContent = p.name + (p.id===state.activePatientId?' (active)':''); if(p.id===state.activePatientId) opt.selected = true;
+    patSwitcher.appendChild(opt);
+  });
+}
+
+patForm.addEventListener('submit', (e)=>{
+  e.preventDefault();
+  const name = document.getElementById('pat-name').value.trim();
+  const age = document.getElementById('pat-age').value.trim();
+  const notes = document.getElementById('pat-notes').value.trim();
+  if(!name) return;
+  const id = uid();
+  state.patients.push({ id, name, age, notes });
+  state.records[id] = { meds:[], appts:[], vitals:[], gamify:{ xp:0 } };
+  if(!state.activePatientId) state.activePatientId = id;
+  save(state);
+  e.target.reset();
+  renderPatients(); renderPatientSwitcher(); renderDashboard();
+});
+
+patSwitcher.addEventListener('change', (e)=>{
+  state.activePatientId = e.target.value;
+  ensureActivePatient(); save(state);
+  toast(`Switched to ${state.patients.find(p=>p.id===state.activePatientId)?.name||'Patient'}`);
+  renderDashboard();
+});
+
+// ===== Seed demo data =====
+document.getElementById('seed-demo').addEventListener('click', ()=>{
+  if(state.patients.length===0){
+    const a = uid(), b = uid();
+    state.patients = [
+      { id:a, name:'Riya Sharma', age:'68', notes:'T2D, Hypertension' },
+      { id:b, name:'Arun Mehta', age:'72', notes:'Post-op, BP' },
+    ];
+    state.activePatientId = a;
+    state.records[a] = { meds:[], appts:[], vitals:[], gamify:{ xp:0 } };
+    state.records[b] = { meds:[], appts:[], vitals:[], gamify:{ xp:0 } };
+  }
+  const r = rec();
+  if(r.meds.length===0){
+    r.meds.push({ id:uid(), name:'Metformin', dose:'500 mg', time:'08:00', history:[{ date: todayISO(), status:'Taken'}]});
+    r.meds.push({ id:uid(), name:'Amlodipine', dose:'5 mg', time:'20:00', history:[{ date: todayISO(), status:'Missed'}]});
+  }
+  if(r.appts.length===0){
+    r.appts.push({ id:uid(), doctor:'Dr. Patel', type:'Cardiologist', date: todayISO(), time:'10:30', location:'Fortis Andheri', status:'upcoming', gcalUrl:'https://calendar.google.com'});
+  }
+  if(r.vitals.length===0){
+    const d = new Date();
+    for(let i=0;i<14;i++){
+      const dd = new Date(d); dd.setDate(d.getDate()-i);
+      const date = dd.toISOString().slice(0,10);
+      r.vitals.push({ id:uid(), date, bpSystolic: 118+Math.round(Math.random()*10), bpDiastolic: 75+Math.round(Math.random()*8), glucose: 90+Math.round(Math.random()*40), weight: 70+Math.round(Math.random()*2) });
+    }
+  }
+  save(state);
+  renderPatientSwitcher(); renderPatients(); renderMeds(); renderAppts(); renderVitals(); renderDashboard();
+  initTimeAccents();
+  toast('Demo data loaded ✅');
+});
+
+// ===== Gamification helpers =====
+function addXP(r, amount){
+  r.gamify = r.gamify || { xp:0 };
+  r.gamify.xp = Math.max(0, (r.gamify.xp||0) + amount);
+  save(state);
+}
+function calcLevel(xp){
+  const level = Math.floor((xp||0)/100) + 1;
+  const cur = (xp||0) % 100;
+  const next = 100;
+  return { level, cur, next, pct: Math.min(100, Math.round(cur/next*100)) };
+}
+// streak = consecutive days up to today where ALL meds are Taken and none Missed
+function computeStreak(r){
+  if(!r.meds.length) return 0;
+  const today = new Date();
+  let streak = 0;
+  for(let offset=0; offset<60; offset++){
+    const d = new Date(today); d.setDate(today.getDate()-offset);
+    const iso = d.toISOString().slice(0,10);
+    let anyScheduled = false;
+    let allTaken = true;
+    for(const m of r.meds){
+      const entries = (m.history||[]).filter(h=>h.date===iso);
+      if(entries.length>0){ anyScheduled = true; }
+      const hasTaken = entries.some(e=>e.status==='Taken');
+      const hasMissed = entries.some(e=>e.status==='Missed');
+      if(entries.length>0 && (!hasTaken || hasMissed)) allTaken = false;
+    }
+    if(!anyScheduled){
+      if(offset===0) return 0; else break;
+    }
+    if(allTaken) streak++; else break;
+  }
+  return streak;
+}
+function computeBadges(r){
+  const totalDoses = r.meds.reduce((acc,m)=> acc + (m.history?.length||0), 0);
+  const streak = computeStreak(r);
+  const vitalsCount = r.vitals.length;
+  return [
+    { id:'first', name:'First Dose', desc:'Logged your first Taken dose', icon:'🥇', unlocked: totalDoses>=1 },
+    { id:'ten', name:'10 Doses', desc:'Logged 10 medication events', icon:'🔟', unlocked: totalDoses>=10 },
+    { id:'streak7', name:'7-Day Champion', desc:'7-day perfect adherence streak', icon:'🔥', unlocked: streak>=7 },
+    { id:'vitals20', name:'Vitals Master', desc:'Logged 20 vitals entries', icon:'💉', unlocked: vitalsCount>=20 },
+  ];
+}
+
+// ===== Medications =====
+const medList = document.getElementById('med-list');
+const medHistory = document.getElementById('med-history');
+let adherenceChart;
+
+function renderMeds(){
+  const r = rec();
+  medList.innerHTML = '';
+
+  // (1) Only show meds in Daily Schedule that are NOT yet logged today
+  const today = todayISO();
+  const todaysMeds = r.meds.filter(m => !(m.history||[]).some(h => h.date === today));
+
+  if(todaysMeds.length === 0){
+    medList.innerHTML = '<li class="p-4 text-sm text-gray-500">All set for today 👏. Add meds or come back later.</li>';
+  } else {
+    todaysMeds.forEach(m => {
+      const li = document.createElement('li');
+      li.className = 'flex items-center justify-between p-3';
+      li.innerHTML = `
+        <div class="min-w-0">
+          <p class="font-medium text-gray-800 truncate">${m.name} <span class="text-sm text-gray-500">(${m.dose})</span></p>
+          <div class="mt-1">
+            <span class="time-pill"><span>⏰</span><span class="pill-time">${m.time}</span></span>
+          </div>
+        </div>
+        <div class="flex gap-2">
+          <button class="inline-flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-medium shadow-sm transition active:scale-[.98] bg-blue-600 text-white hover:bg-blue-500">Taken</button>
+          <button class="inline-flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-medium shadow-sm transition active:scale-[.98] border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">Missed</button>
+        </div>
+      `;
+      const [btnTaken, btnMissed] = li.querySelectorAll('button');
+      btnTaken.addEventListener('click', () => markMed(m.id, 'Taken'));
+      btnMissed.addEventListener('click', () => markMed(m.id, 'Missed'));
+
+      // color the time pill only (requirement #2)
+      const pill = li.querySelector('.time-pill');
+      accentPill(pill, m.time);
+
+      medList.appendChild(li);
+    });
+  }
+
+  // history log (all events, newest first)
+  const historyItems = r.meds.flatMap(m => (m.history||[]).map(h => ({...h, med:m.name, dose:m.dose})))
+                      .sort((a,b)=> a.date < b.date ? 1 : -1);
+  medHistory.innerHTML = '';
+  if(historyItems.length === 0){
+    medHistory.innerHTML = '<li class="p-4 text-sm text-gray-500">No history yet. Mark doses to build adherence history.</li>';
+  } else {
+    historyItems.forEach((h) => {
+      const li = document.createElement('li');
+      li.className = 'flex items-center justify-between rounded-xl border p-2';
+      li.innerHTML = `
+        <span class="text-gray-700">${h.med} <span class="text-xs text-gray-500">(${h.dose})</span></span>
+        <span class="text-xs text-gray-500">${h.date}</span>
+        <span class="${h.status==='Taken'?'text-green-600':'text-red-600'}">${h.status}</span>
+      `;
+      medHistory.appendChild(li);
+    });
+  }
+
+  // adherence chart
+  const total = r.meds.reduce((acc,m)=> acc + ((m.history||[]).length), 0);
+  const taken = r.meds.reduce((acc,m)=> acc + ((m.history||[]).filter(h=>h.status==='Taken').length), 0);
+  const pct = total ? Math.round((taken/total)*100) : 0;
+
+  const ctx = document.getElementById('adherenceChart');
+  if(adherenceChart) adherenceChart.destroy();
+  adherenceChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: { labels: ['Adherence', 'Remaining'], datasets: [{ data: [pct, 100-pct], backgroundColor: ['#2563eb', '#e5e7eb'], borderWidth: 0 }] },
+    options: { cutout:'70%', plugins:{ legend:{ display:false } } }
+  });
+}
+
+function markMed(id, status){
+  const r = rec();
+  const med = r.meds.find(m=>m.id===id);
+  if(!med) return;
+
+  // prevent duplicate log for today (extra safety)
+  const today = todayISO();
+  med.history = med.history || [];
+  if(med.history.some(h=>h.date===today)) { renderMeds(); return; }
+
+  med.history.push({ date: today, status });
+  if(status==='Taken'){ addXP(r, 10); toast('+10 XP • Dose taken ✅'); }
+  save(state);
+  renderMeds(); renderDashboard(); // re-render removes it from Daily Schedule
+}
+
+document.getElementById('med-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const r = rec();
+  const name = document.getElementById('med-name').value.trim();
+  const dose = document.getElementById('med-dose').value.trim();
+  const time = document.getElementById('med-time').value;
+  if(!name || !dose || !time) return;
+  r.meds.unshift({ id: uid(), name, dose, time, history: [] });
+  save(state);
+  e.target.reset();
+  document.getElementById('med-time').value = '08:00';
+  initTimeAccents();
+  renderMeds();
+});
+
+// ===== Appointments =====
+const apptList = document.getElementById('appt-list');
+function renderAppts(){
+  const r = rec();
+  apptList.innerHTML='';
+  if(r.appts.length===0){
+    apptList.innerHTML = '<li class="p-4 text-sm text-gray-500">No upcoming appointments. Add one above.</li>';
+    return;
+  }
+  r.appts
+    .filter(a=>a.status!=='done')
+    .sort((a,b)=> a.date<b.date?-1:1)
+    .forEach(a=>{
+      const li = document.createElement('li');
+      li.className='flex items-center justify-between p-3';
+      li.innerHTML = `
+        <div>
+          <p class="font-medium text-gray-800">${a.doctor}</p>
+          <div class="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-600">
+            <span class="rounded-lg border px-2 py-1 bg-gray-50">${a.type||'—'}</span>
+            <span class="time-pill"><span>⏰</span><span>${a.time}</span></span>
+            <span>${a.date}</span>
+            <span>•</span>
+            <span>${a.location}</span>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          ${a.gcalUrl ? `<a class="inline-flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-medium shadow-sm transition active:scale-[.98] border border-gray-300 bg-white text-gray-700 hover:bg-gray-50" href="${a.gcalUrl}" target="_blank" rel="noreferrer">Google Calendar</a>`: ''}
+        </div>`;
+      // color the appointment time pill
+      accentPill(li.querySelector('.time-pill'), a.time);
+      apptList.appendChild(li);
+    });
+}
+
+document.getElementById('appt-form').addEventListener('submit', (e)=>{
+  e.preventDefault();
+  const r = rec();
+  const doctor = document.getElementById('appt-doctor').value.trim();
+  const type   = document.getElementById('appt-type').value.trim();
+  const date   = document.getElementById('appt-date').value;
+  const time   = document.getElementById('appt-time').value;
+  const location = document.getElementById('appt-location').value.trim();
+  const gcalUrl  = document.getElementById('appt-gcal').value.trim();
+  r.appts.unshift({ id: uid(), doctor, type, date, time, location, gcalUrl: gcalUrl || undefined, status: 'upcoming' });
+  save(state);
+  e.target.reset();
+  document.getElementById('appt-time').value='10:00';
+  initTimeAccents();
+  renderAppts();
+});
+
+// ===== Vitals =====
+const vitalsList = document.getElementById('vitals-list');
+let weeklyChart, monthlyChart;
+function renderVitals(){
+  const r = rec();
+  const sorted = [...r.vitals].sort((a,b)=> a.date<b.date?1:-1).slice(0,10);
+  vitalsList.innerHTML = '';
+  if(sorted.length===0){
+    vitalsList.innerHTML = '<li class="p-4 text-sm text-gray-500">No vitals yet. Add entries above.</li>';
+  } else {
+    sorted.forEach(v=>{
+      const li = document.createElement('li');
+      li.className='flex items-center justify-between p-2';
+      li.innerHTML = `<span class="text-gray-700">${v.date}</span>
+        <span class="text-gray-500">BP ${v.bpSystolic||'-'}/${v.bpDiastolic||'-'} • Glu ${v.glucose||'-'} • Wt ${v.weight||'-'}</span>`;
+      vitalsList.appendChild(li);
+    });
+  }
+
+  const weekly = summarizeVitals(7);
+  const monthly = summarizeVitals(30);
+  const weeklyCtx = document.getElementById('weeklyChart');
+  const monthlyCtx = document.getElementById('monthlyChart');
+  if(weeklyChart) weeklyChart.destroy();
+  if(monthlyChart) monthlyChart.destroy();
+  weeklyChart = new Chart(weeklyCtx, {
+    type: 'line',
+    data: { labels: weekly.map(d=>d.date), datasets: [
+      { label:'BP Systolic', data: weekly.map(d=>d.bpSystolic), borderWidth:2, tension:.3 },
+      { label:'Glucose', data: weekly.map(d=>d.glucose), borderWidth:2, tension:.3 },
+    ]},
+    options: { scales: { y: { beginAtZero:false } } }
+  });
+  monthlyChart = new Chart(monthlyCtx, {
+    type: 'line',
+    data: { labels: monthly.map(d=>d.date), datasets: [
+      { label:'BP Systolic', data: monthly.map(d=>d.bpSystolic), borderWidth:2, tension:.3 },
+      { label:'Weight', data: monthly.map(d=>d.weight), borderWidth:2, tension:.3 },
+    ]},
+    options: { scales: { y: { beginAtZero:false } } }
+  });
+}
+function summarizeVitals(days){
+  const r = rec();
+  const since = new Date(); since.setDate(since.getDate()-days);
+  const filtered = r.vitals.filter(rr=> new Date(rr.date) >= since);
+  const byDate = new Map();
+  filtered.forEach(rr=>{
+    const item = byDate.get(rr.date) || { date: rr.date };
+    byDate.set(rr.date, { ...item, bpSystolic: rr.bpSystolic ?? item.bpSystolic, glucose: rr.glucose ?? item.glucose, weight: rr.weight ?? item.weight });
+  });
+  return Array.from(byDate.values()).sort((a,b)=> a.date > b.date ? 1 : -1);
+}
+document.getElementById('vitals-form').addEventListener('submit',(e)=>{
+  e.preventDefault();
+  const r = rec();
+  const date = document.getElementById('vit-date').value;
+  const bpSystolic = parseFloat(document.getElementById('vit-sys').value) || undefined;
+  const bpDiastolic = parseFloat(document.getElementById('vit-dia').value) || undefined;
+  const glucose = parseFloat(document.getElementById('vit-glu').value) || undefined;
+  const weight = parseFloat(document.getElementById('vit-wt').value) || undefined;
+  r.vitals.unshift({ id: uid(), date, bpSystolic, bpDiastolic, glucose, weight });
+  addXP(r, 5); toast('+5 XP • Vitals logged ✅');
+  save(state);
+  e.target.reset();
+  renderVitals(); renderDashboard();
+});
+
+// ===== Dashboard (incl. Gamification) =====
+let peaceChart, dashGluChart;
+function renderDashboard(){
+  const r = rec();
+  const total = r.meds.reduce((acc,m)=> acc + ((m.history||[]).length), 0);
+  const taken = r.meds.reduce((acc,m)=> acc + ((m.history||[]).filter(h=>h.status==='Taken').length), 0);
+  const adherence = total ? Math.round((taken/total)*100) : 0;
+
+  const done = r.appts.filter(a=>a.status==='done').length;
+  const missedAppts = r.appts.filter(a=>a.status==='missed').length;
+
+  const since = new Date(); since.setDate(since.getDate()-7);
+  const anomalies = r.vitals.filter(v => new Date(v.date)>=since && ((v.bpSystolic && v.bpSystolic>140) || (v.glucose && v.glucose>180))).length;
+
+  const peace = Math.max(0, Math.min(100, Math.round(0.6*adherence + 0.2*(100 - missedAppts*10) + 0.2*(100 - anomalies*10))));
+
+  const ctx = document.getElementById('peaceChart');
+  if(peaceChart) peaceChart.destroy();
+  peaceChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: { labels:['Peace','Rest'], datasets:[{ data:[peace, 100-peace], backgroundColor:['#2563eb','#e5e7eb'], borderWidth:0 }] },
+    options: { cutout:'70%', plugins:{ legend:{ display:false } } }
+  });
+
+  const digest = document.getElementById('digest-list');
+  digest.innerHTML = `
+    <li class="mb-2">Meds adherence: <span class="font-medium">${adherence}%</span></li>
+    <li class="mb-2">Appointments done/missed: <span class="font-medium">${done}/${missedAppts}</span></li>
+    <li>Vital anomalies (last 7d): <span class="font-medium">${anomalies}</span></li>
+  `;
+
+  const weekly = summarizeVitals(7);
+  const glu = weekly.map(d=>d.glucose ?? null);
+  const labels = weekly.map(d=>d.date);
+  const gctx = document.getElementById('dashGlucose');
+  if(dashGluChart) dashGluChart.destroy();
+  dashGluChart = new Chart(gctx, {
+    type: 'line',
+    data: { labels, datasets:[{ label:'Glucose', data: glu, borderWidth:2, tension:.3 }] },
+    options: { scales: { y: { beginAtZero:false } } }
+  });
+
+  const streak = computeStreak(r);
+  document.getElementById('streak-value').textContent = streak;
+  const xp = (r.gamify?.xp)||0;
+  const { level, cur, next, pct } = calcLevel(xp);
+  document.getElementById('level-value').textContent = level;
+  document.getElementById('xp-cur').textContent = cur;
+  document.getElementById('xp-next').textContent = next;
+  document.getElementById('xp-bar').style.width = pct + '%';
+
+  const badges = computeBadges(r);
+  const ul = document.getElementById('badges-list');
+  ul.innerHTML = '';
+  badges.forEach(b=>{
+    const li = document.createElement('li');
+    li.className = 'flex items-start gap-2';
+    li.innerHTML = `
+      <span class="text-xl">${b.icon}</span>
+      <div>
+        <p class="font-medium ${b.unlocked?'text-gray-800':'text-gray-400'}">${b.name} ${b.unlocked?'':'(locked)'}</p>
+        <p class="text-xs ${b.unlocked?'text-gray-500':'text-gray-400'}">${b.desc}</p>
+      </div>
+    `;
+    ul.appendChild(li);
+  });
+}
+
+// ===== Reminders Engine =====
+const CHECK_INTERVAL_MS = 60 * 1000;
+const GRACE_MINUTES = 15;
+function checkReminders(){
+  const r = rec();
+  const now = new Date();
+  const hh = String(now.getHours()).padStart(2,'0');
+  const mm = String(now.getMinutes()).padStart(2,'0');
+  const currentHM = `${hh}:${mm}`;
+  const today = todayISO();
+
+  r.meds.forEach(m=>{
+    if(m.time === currentHM){
+      const already = (m.history||[]).some(h=> h.date===today);
+      if(!already){
+        const p = state.patients.find(p=>p.id===state.activePatientId);
+        toast(`🔔 ${p?.name||'Patient'}: ${m.name} (${m.dose}) due now`, 'info');
+        notify('Medication Reminder', `${p?.name||'Patient'}: ${m.name} (${m.dose}) is due now`);
+      }
+    }
+    const [mh, mmu] = m.time.split(':').map(Number);
+    const medTime = new Date(now); medTime.setHours(mh, mmu, 0, 0);
+    const diffMin = Math.floor((now - medTime)/60000);
+    if(diffMin >= GRACE_MINUTES && diffMin < GRACE_MINUTES+1){
+      const already = (m.history||[]).some(h=> h.date===today);
+      if(!already){
+        toast(`⚠️ Missed? ${m.name} scheduled at ${m.time}. Mark Taken if you did.`, 'warn');
+        notify('Medication Missed?', `${m.name} scheduled at ${m.time}. Mark Taken if you did.`);
+      }
+    }
+  });
+}
+setInterval(checkReminders, CHECK_INTERVAL_MS);
+
+// ===== Init =====
+ensureActivePatient();
+renderPatientSwitcher();
+renderPatients();
+renderMeds();
+renderAppts();
+renderVitals();
+renderDashboard();
+show('dash');
+initTimeAccents();
+</script>
+</body>
+</html>
