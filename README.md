@@ -1,6 +1,6 @@
 # 🩺 CareCompanion
 
-A frontend patient-care dashboard to manage patients, medications, appointments, and vitals — with interactive graphs and light gamification.
+A frontend patient-care dashboard to manage patients, medications, appointments, and vitals with interactive graphs and light gamification.
 
 🔗 Live Demo: https://ankidharmani-tech.github.io/care-companion/
 
